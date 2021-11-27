@@ -1,0 +1,61 @@
+version: '3'
+services:
+    # PHP
+    php:
+        build:
+            context: ./config/docker
+            dockerfile: Dockerfile
+            args:
+                PHP_VERSION: ${PHP_VERSION:?latest}
+        container_name: ${APP_NAME:?err}-php
+        volumes:
+            - './app:/var/www/html'
+        depends_on:
+            - db
+    # Nginx
+    nginx:
+        image: nginx:${NGINX_VERSION:?latest}
+        container_name: ${APP_NAME:?err}-nginx
+        ports:
+            - ${NGINX_PORT?:80}:${NGINX_PORT_LOCAL?:80}
+            - ${NGINX_PORT_SSL?:443}:${NGINX_PORT_SSL_LOCAL?:443}
+        links:
+            - 'php'
+            - 'db'
+        volumes:
+            - './app:/var/www/html'
+            - './config/nginx:/etc/nginx/conf.d'
+    # MySQL
+    db:
+        image: mysql:${MYSQL_VERSION}
+        container_name: ${APP_NAME:?err}-db
+        restart: unless-stopped
+        tty: true
+        ports:
+        - ${MYSQL_PORT?:3306}:${MYSQL_PORT_LOCAL?:3306}
+        environment:
+            MYSQL_DATABASE: ${MYSQL_DATABASE:?err}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?err}
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        volumes:
+        - dbdata:/var/lib/mysql/
+        - ./config/mysql/my.cnf:/etc/mysql/my.cnf
+    # PHPMyAdmin
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin:${PMA_VERSION:?latest}
+        container_name: ${APP_NAME:?err}-phpmyadmin
+        ports:
+            - ${PMA_PORT?:9988}:${PMA_PORT_LOCAL?:80}
+        environment:
+            - PMA_ARBITRARY=1
+            - PMA_HOST=db
+            - PMA_PORT=${MYSQL_PORT?:3306}
+            - PMA_USER=root
+            - PMA_PASSWORD=${MYSQL_ROOT_PASSWORD:?err}
+        depends_on:
+            - db
+
+volumes:
+  dbdata:
+    driver: local
